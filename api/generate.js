@@ -22,7 +22,7 @@ export default async function handler(req) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: maxTokens || 4500,
+        max_tokens: maxTokens || 3000,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
