@@ -1342,18 +1342,8 @@ function checkBenchmarkReminder(){
   }
 }
 
-function loadLastAnalysis(){
-  if(analyzeHistory.length>0){
-    const last=analyzeHistory[0];
-    document.getElementById('quickAnalyzeText').textContent=last.text;
-    document.getElementById('quickAnalyzeDate').textContent=last.dateLabel+' · '+last.account;
-    document.getElementById('quickAnalyzeResult').style.display='block';
-  }
-}
-
 renderAnalyzeHistory();
 checkBenchmarkReminder();
-loadLastAnalysis();
 
 // ── 릴스 URL → 캡션 자동 가져오기 ──
 let _reelsCaption='', _reelsAccount='', _reelsUrl='';
