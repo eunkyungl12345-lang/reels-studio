@@ -418,10 +418,24 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);flex-sh
     </div>
   </div>
 
-  <!-- 원클릭 분석 결과 -->
+  <!-- 주간 벤치마킹 알림 -->
+  <div id="benchmarkReminder" style="display:none" class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:linear-gradient(120deg,#fff3e0,#ffe0b2);border:1px solid #ffcc80;border-radius:12px">
+      <div style="font-size:20px">⏰</div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#e65100">이번 주 벤치마킹 아직 안 했어요!</div>
+        <div style="font-size:11px;color:#bf360c;margin-top:2px">위 계정 [분석] 버튼을 눌러보세요</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 원클릭 분석 결과 (최신) -->
   <div id="quickAnalyzeResult" style="display:none">
     <div class="card" style="border:1px solid var(--gold);background:var(--gold-soft)">
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px">📊 벤치마킹 분석 결과</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700">📊 벤치마킹 분석 결과</div>
+        <div style="font-size:10px;color:var(--muted)" id="quickAnalyzeDate"></div>
+      </div>
       <div style="font-size:13px;line-height:1.9;white-space:pre-wrap" id="quickAnalyzeText"></div>
     </div>
     <div style="display:flex;gap:6px;margin-top:8px;margin-bottom:12px" id="quickTopicBtns"></div>
@@ -433,6 +447,12 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);flex-sh
     <div class="loading-text">벤치마킹 분석 중…</div>
     <div class="loading-sub">계정 스타일 분석 + 주제 추천 중이에요</div>
   </div>
+
+  <!-- 분석 히스토리 -->
+  <details class="fold" style="margin-bottom:12px">
+    <summary>▸ 📂 지난 분석 히스토리</summary>
+    <div id="analyzeHistory" style="margin-top:6px"></div>
+  </details>
 
   <!-- 수동 분석 (기존) -->
   <details class="fold" style="margin-bottom:12px">
@@ -1241,6 +1261,87 @@ function removeBenchmark(i){
 }
 renderBenchmarks();
 
+// ── 분석 히스토리 & 알림 ──
+let analyzeHistory=[];
+try{ analyzeHistory=JSON.parse(localStorage.getItem('reels_analyze_history')||'[]'); }catch(e){}
+
+function saveAnalyzeHistory(account, text){
+  const now=new Date();
+  const entry={
+    account,
+    text,
+    date: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`,
+    dateLabel: `${now.getMonth()+1}/${now.getDate()} ${['일','월','화','수','목','금','토'][now.getDay()]}`,
+    id: Date.now()
+  };
+  analyzeHistory.unshift(entry);
+  analyzeHistory=analyzeHistory.slice(0,20); // 최대 20개
+  localStorage.setItem('reels_analyze_history', JSON.stringify(analyzeHistory));
+  renderAnalyzeHistory();
+}
+
+function renderAnalyzeHistory(){
+  const el=document.getElementById('analyzeHistory');
+  if(!el) return;
+  if(!analyzeHistory.length){
+    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">아직 분석 이력이 없어요</div>';
+    return;
+  }
+  el.innerHTML=analyzeHistory.map((h,i)=>
+    `<div class="card" style="margin-bottom:8px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:12px;font-weight:700">${h.account} <span style="font-weight:400;color:var(--muted)">${h.dateLabel}</span></div>
+        <button onclick="deleteAnalyzeHistory(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px">✕</button>
+      </div>
+      <div style="font-size:11.5px;line-height:1.7;color:var(--muted-2);white-space:pre-wrap;max-height:100px;overflow:hidden">${(h.text||'').substring(0,200)}${h.text?.length>200?'...':''}</div>
+      <button onclick="expandHistory(${i})" style="background:none;border:none;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;padding:4px 0;margin-top:4px">전체 보기 →</button>
+    </div>`
+  ).join('');
+}
+
+function deleteAnalyzeHistory(i){
+  analyzeHistory.splice(i,1);
+  localStorage.setItem('reels_analyze_history', JSON.stringify(analyzeHistory));
+  renderAnalyzeHistory();
+}
+
+function expandHistory(i){
+  const h=analyzeHistory[i];
+  document.getElementById('quickAnalyzeText').textContent=h.text;
+  document.getElementById('quickAnalyzeDate').textContent=h.dateLabel+' · '+h.account;
+  document.getElementById('quickAnalyzeResult').style.display='block';
+  document.getElementById('quickAnalyzeResult').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function checkBenchmarkReminder(){
+  const reminder=document.getElementById('benchmarkReminder');
+  if(!reminder) return;
+  const now=new Date();
+  const day=now.getDay(); // 0일 ~ 6토
+  // 월(1), 목(4)에 알림
+  const isReminderDay=(day===1||day===4);
+  // 이번 주에 분석한 적 있는지 확인
+  const thisWeekStart=new Date(now);
+  thisWeekStart.setDate(now.getDate()-now.getDay());
+  const doneThisWeek=analyzeHistory.some(h=>new Date(h.date)>=thisWeekStart);
+  if(isReminderDay && !doneThisWeek){
+    reminder.style.display='block';
+  }
+}
+
+function loadLastAnalysis(){
+  if(analyzeHistory.length>0){
+    const last=analyzeHistory[0];
+    document.getElementById('quickAnalyzeText').textContent=last.text;
+    document.getElementById('quickAnalyzeDate').textContent=last.dateLabel+' · '+last.account;
+    document.getElementById('quickAnalyzeResult').style.display='block';
+  }
+}
+
+renderAnalyzeHistory();
+checkBenchmarkReminder();
+loadLastAnalysis();
+
 // ── 원클릭 벤치마킹 분석 ──
 async function quickAnalyze(account){
   const persona=getPersona();
@@ -1279,6 +1380,9 @@ ${account} (인스타그램 살림/라이프스타일 계정)
 
     const res=await callClaude(prompt);
     document.getElementById('quickAnalyzeText').textContent=res;
+    const now=new Date();
+    document.getElementById('quickAnalyzeDate').textContent=`${now.getMonth()+1}/${now.getDate()} · ${account}`;
+    saveAnalyzeHistory(account, res);
 
     // 주제 3개 추출해서 버튼으로 만들기
     const topicLines=res.split('\n').filter(l=>/^\d+\.\s*\[/.test(l.trim())||/^\d+\.\s*\*\*/.test(l.trim())).slice(0,3);
