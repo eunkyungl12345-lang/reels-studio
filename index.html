@@ -1230,9 +1230,10 @@ function buildBlogPrompt(topic){
 메인 키워드 맨 앞, 30~35자, 검색의도 단어 포함. 제목 3개 번호로.
 
 [본문]
+★★★ 절대 짧게 쓰지 마. 반드시 ${len} 분량을 채워야 함. 소제목 3~5개 + 각 소제목 아래 3~5문단 ★★★
 소제목은 ■ 질문형으로. 문단 사이 빈 줄. 모바일 1~3줄 단위.
 사진 위치는 [사진: ○○ 찍기 / ALT: ○○] 으로 표시.
-채우기용 문장 금지. 분량 ${len} 지키기.
+채우기용 문장 금지, 하지만 분량은 반드시 ${len} 이상.
 
 [발행 체크리스트]
 □ 서치어드바이저(searchadvisor.naver.com) 색인 요청
@@ -1248,7 +1249,7 @@ async function generateBlog(){
   if(!topic){ toast('주제를 먼저 정해주세요'); document.getElementById('blogTopic').focus(); return; }
   const btn=document.getElementById('blogGenBtn'), lc=document.getElementById('blogLoading'), rw=document.getElementById('blogResult');
   btn.disabled=true; lc.classList.add('on'); rw.classList.remove('on'); lc.scrollIntoView({behavior:'smooth',block:'center'});
-  try{ renderBlogResult(await callClaude(buildBlogPrompt(topic), 3000)); }
+  try{ renderBlogResult(await callClaude(buildBlogPrompt(topic), 4096)); }
   catch(e){
     lc.innerHTML=`<div style="font-size:26px;margin-bottom:10px">😢</div><div class="loading-text">실패했어요</div><div class="loading-sub" style="color:var(--accent);margin-top:6px">${e.message}</div><button onclick="document.getElementById('blogLoading').classList.remove('on');document.getElementById('blogGenBtn').disabled=false" style="margin-top:14px;padding:8px 18px;border-radius:10px;border:1px solid var(--border-2);background:transparent;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit">닫기</button>`;
     return;
