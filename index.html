@@ -877,13 +877,13 @@ function pickMono(el,m){ el.parentNode.querySelectorAll('.pill').forEach(c=>c.cl
 function toggleMono(btn){ const w=document.getElementById('monoWrap'); const open=w.classList.toggle('open'); btn.textContent=open?'－ 수익화 목표 접기':'＋ 수익화 목표 넣기 (선택)'; }
 
 // ── API 호출 (서버 프록시) ──
-async function callClaude(prompt){
+async function callClaude(prompt, maxTokens){
   let res;
   try{
     res=await fetch('/api/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ prompt })
+      body:JSON.stringify({ prompt, maxTokens: maxTokens||2200 })
     });
   }catch(e){ throw new Error('네트워크 오류. 서버 연결을 확인해주세요.'); }
   if(!res.ok){
@@ -1187,8 +1187,8 @@ function buildBlogPrompt(topic){
 ━━━ 페르소나 ━━━
 · 계정: 말랑독 (malangdog01) — 네이버 블로그
 · 주력 주제: 결혼(웨딩)·육아 + 맛집·일상
-· 계정 소개: ${persona.description}
-· 콘텐츠 스타일: ${persona.style}
+· 내돈내산 후기 전문. 직접 사보고/해보고 솔직하게 쓰는 스타일.
+· 블로그 페르소나는 릴스 페르소나와 별개임. 블로그는 "말랑독"으로만 작성.
 
 ━━━ 이 글 ━━━
 · 주제: ${topic}
@@ -1260,7 +1260,7 @@ async function generateBlog(){
   if(!topic){ toast('주제를 먼저 정해주세요'); document.getElementById('blogTopic').focus(); return; }
   const btn=document.getElementById('blogGenBtn'), lc=document.getElementById('blogLoading'), rw=document.getElementById('blogResult');
   btn.disabled=true; lc.classList.add('on'); rw.classList.remove('on'); lc.scrollIntoView({behavior:'smooth',block:'center'});
-  try{ renderBlogResult(await callClaude(buildBlogPrompt(topic))); }
+  try{ renderBlogResult(await callClaude(buildBlogPrompt(topic), 4500)); }
   catch(e){
     lc.innerHTML=`<div style="font-size:26px;margin-bottom:10px">😢</div><div class="loading-text">실패했어요</div><div class="loading-sub" style="color:var(--accent);margin-top:6px">${e.message}</div><button onclick="document.getElementById('blogLoading').classList.remove('on');document.getElementById('blogGenBtn').disabled=false" style="margin-top:14px;padding:8px 18px;border-radius:10px;border:1px solid var(--border-2);background:transparent;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit">닫기</button>`;
     return;
