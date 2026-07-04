@@ -429,11 +429,14 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);flex-sh
   </div>
 
   <!-- STEP 1: 릴스 입력 -->
-  <div class="step-label"><b>1</b> 터진 릴스 붙여넣기</div>
+  <div class="step-label"><b>1</b> 터진 릴스 URL 붙여넣기</div>
   <div class="card">
-    <div class="hint">벤치마킹 계정에서 터진 릴스의 음성/자막/캡션을 복사해서 붙여넣어요.</div>
-    <textarea class="analyze-ta" id="analyzeTa" placeholder="릴스 음성 또는 자막을 여기 붙여넣어요…&#10;&#10;예:&#10;맞벌이 부부 300일차&#10;아직도 청소 주말로 미루세요?&#10;저희는 주말에 쉬고 싶어서 이렇게 해요&#10;1. 타이머 10분 맞추기&#10;2. 구역 분담..."></textarea>
-    <input type="text" class="text-input" id="analyzeAccount" placeholder="계정명 (선택, 예: @joshleeliving)" style="margin-bottom:10px">
+    <div class="hint">벤치마킹 계정에서 터진 릴스 URL을 복사해서 붙여넣어요. 캡션은 자동으로 가져와요!</div>
+    <input type="text" class="text-input" id="reelsUrlInput" placeholder="인스타 릴스 URL (예: https://www.instagram.com/reel/...)" style="margin-bottom:10px">
+    <div id="reelsPreview" style="display:none;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;font-size:12px">
+      <div style="font-weight:600;color:var(--accent)" id="reelsPreviewAccount"></div>
+      <div style="color:var(--muted-2);margin-top:4px;line-height:1.6" id="reelsPreviewCaption"></div>
+    </div>
     <input type="text" class="text-input" id="myTopicInput" placeholder="내 주제 입력 (예: 퇴근 후 10분 청소루틴)" style="margin-bottom:10px">
     <button class="generate-btn" id="analyze3StepBtn" onclick="run3StepAnalysis()">🔥 3단계 분석 + 대본 생성</button>
   </div>
@@ -1352,13 +1355,48 @@ renderAnalyzeHistory();
 checkBenchmarkReminder();
 loadLastAnalysis();
 
+// ── 릴스 URL → 캡션 자동 가져오기 ──
+let _reelsCaption='', _reelsAccount='', _reelsUrl='';
+document.addEventListener('DOMContentLoaded', function(){
+  const urlInput=document.getElementById('reelsUrlInput');
+  if(urlInput) urlInput.addEventListener('input', debounce(fetchReelsInfo, 800));
+});
+// 즉시 실행도 가능하도록
+setTimeout(()=>{
+  const urlInput=document.getElementById('reelsUrlInput');
+  if(urlInput) urlInput.addEventListener('input', debounce(fetchReelsInfo, 800));
+},500);
+
+function debounce(fn,ms){ let t; return function(){ clearTimeout(t); t=setTimeout(fn,ms); }; }
+
+async function fetchReelsInfo(){
+  const url=document.getElementById('reelsUrlInput').value.trim();
+  const preview=document.getElementById('reelsPreview');
+  if(!url||!url.includes('instagram.com')){ preview.style.display='none'; return; }
+  _reelsUrl=url;
+  try{
+    const res=await fetch(`https://api.instagram.com/oembed?url=${encodeURIComponent(url)}`);
+    if(res.ok){
+      const data=await res.json();
+      _reelsCaption=data.title||'';
+      _reelsAccount=data.author_name||'';
+      document.getElementById('reelsPreviewAccount').textContent='@'+_reelsAccount;
+      document.getElementById('reelsPreviewCaption').textContent=_reelsCaption.substring(0,200)+((_reelsCaption.length>200)?'...':'');
+      preview.style.display='block';
+    }
+  }catch(e){ /* 실패해도 무시 */ }
+}
+
 // ── 3단계 릴스 분석 ──
 async function run3StepAnalysis(){
-  const reelsText=document.getElementById('analyzeTa').value.trim();
-  const account=document.getElementById('analyzeAccount').value.trim();
+  const url=document.getElementById('reelsUrlInput').value.trim();
   const myTopic=document.getElementById('myTopicInput').value.trim();
-  if(!reelsText){ toast('터진 릴스 음성/자막을 붙여넣어주세요'); return; }
+  if(!url){ toast('릴스 URL을 붙여넣어주세요'); return; }
   if(!myTopic){ toast('내 주제를 입력해주세요'); return; }
+
+  // URL에서 가져온 정보 사용
+  const account=_reelsAccount||'';
+  const reelsText=_reelsCaption||url;
 
   const persona=getPersona();
   const btn=document.getElementById('analyze3StepBtn');
@@ -1372,9 +1410,9 @@ async function run3StepAnalysis(){
 
     const prompt=`너는 인스타그램 릴스 전략가이자 대본 작가야. 아래 터진 릴스를 3단계로 분석하고 대본까지 만들어줘.
 
-${account?`[원본 계정] ${account}`:''}
-
-[터진 릴스 음성/자막]
+${account?`[원본 계정] @${account}`:''}
+[릴스 URL] ${url}
+[릴스 캡션]
 ${reelsText}
 
 [내 계정]
