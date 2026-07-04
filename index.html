@@ -1039,8 +1039,18 @@ async function generate(){
 }
 
 function extract(text,key){
-  const re=new RegExp(`\\[${key}\\]([\\s\\S]*?)(?=\\[[^\\]]+\\]|$)`,'i');
-  const m=text.match(re); return m?m[1].trim():'';
+  // [본문], ## 본문, **본문**, # 본문 등 다양한 형식 매칭
+  const patterns=[
+    new RegExp(`\\[${key}\\]([\\s\\S]*?)(?=\\[(?:제목|본문|본 ?대본|CTA|캡션|해시태그|태그|발행|체크)\\]|##\\s|$)`,'i'),
+    new RegExp(`##\\s*${key}[^\\n]*\\n([\\s\\S]*?)(?=##\\s|\\[(?:제목|본문|태그|발행)\\]|$)`,'i'),
+    new RegExp(`\\*\\*${key}\\*\\*[^\\n]*\\n([\\s\\S]*?)(?=\\*\\*|\\[|##|$)`,'i'),
+    new RegExp(`#\\s*${key}[^\\n]*\\n([\\s\\S]*?)(?=#\\s|\\[(?:제목|본문|태그)\\]|---\\s*##|$)`,'i')
+  ];
+  for(const re of patterns){
+    const m=text.match(re);
+    if(m && m[1].trim().length > 20) return m[1].trim();
+  }
+  return '';
 }
 function renderResult(text){
   document.getElementById('hookText').textContent=extract(text,'후킹문장');
