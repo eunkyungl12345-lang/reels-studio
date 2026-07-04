@@ -1256,8 +1256,12 @@ async function generateBlog(){
   btn.disabled=false; lc.classList.remove('on');
 }
 function renderBlogResult(text){
-  document.getElementById('blogTitles').textContent=extract(text,'제목');
-  document.getElementById('blogBody').textContent=extract(text,'본문');
+  console.log('BLOG RAW:', text.substring(0, 500));
+  const title=extract(text,'제목');
+  const body=extract(text,'본문');
+  // 파싱 실패 시 원본 전체를 본문에 표시
+  document.getElementById('blogTitles').textContent=title||'(제목 파싱 실패 — 아래 본문에서 확인)';
+  document.getElementById('blogBody').textContent=body||text;
   document.getElementById('blogChecklist').textContent=extract(text,'발행 체크리스트')||'□ 서치어드바이저 색인 요청\n□ 발행 후 24시간 내 공감·댓글 확보\n□ 태그 8~10개 확인';
   const wrap=document.getElementById('blogTagWrap'); wrap.innerHTML='';
   const raw=extract(text,'태그');
