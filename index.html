@@ -272,6 +272,33 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);flex-sh
 <!-- ========== TAB: 생성 ========== -->
 <div class="tab active" id="tab-generate">
 
+  <!-- 오늘의 할 일 -->
+  <div class="card" style="border:1px solid var(--accent-soft);background:linear-gradient(120deg,#fff6f2,#fdeae4);margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="font-size:20px" id="todayIcon">📅</div>
+      <div style="font-size:14px;font-weight:700" id="todayTask">로딩중...</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted-2);line-height:1.6" id="todayGuide"></div>
+    <div id="autoAction" style="margin-top:8px"></div>
+  </div>
+
+  <!-- 편집 루틴 -->
+  <details class="fold" style="margin-bottom:12px">
+    <summary>▸ 📅 주간 편집 루틴 보기</summary>
+    <div class="card" style="margin-top:2px;padding:12px 14px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:6px 4px;color:var(--muted)">요일</th><th style="text-align:left;padding:6px 4px;color:var(--muted)">할 일</th></tr>
+        <tr style="background:var(--accent-soft)"><td style="padding:6px 4px;font-weight:600">일요일</td><td style="padding:6px 4px">📱 릴스 업로드 + 소통</td></tr>
+        <tr><td style="padding:6px 4px;font-weight:600">월요일</td><td style="padding:6px 4px">🔍 터진 영상 분석 + 대본 기획</td></tr>
+        <tr><td style="padding:6px 4px;font-weight:600">화요일</td><td style="padding:6px 4px">🎬 영상 + 자료 제작</td></tr>
+        <tr style="background:var(--accent-soft)"><td style="padding:6px 4px;font-weight:600">수요일</td><td style="padding:6px 4px">📱 릴스 업로드 + 소통</td></tr>
+        <tr><td style="padding:6px 4px;font-weight:600">목요일</td><td style="padding:6px 4px">🔍 터진 영상 분석 + 대본 기획</td></tr>
+        <tr><td style="padding:6px 4px;font-weight:600">금요일</td><td style="padding:6px 4px">🎬 영상 + 자료 제작</td></tr>
+        <tr><td style="padding:6px 4px;font-weight:600;color:var(--muted)">토요일</td><td style="padding:6px 4px;color:var(--muted)">😴 자유 / 휴식</td></tr>
+      </table>
+    </div>
+  </details>
+
   <button class="suggest-btn" id="suggestBtn" onclick="suggestTopics()"><span>✨</span> 오늘 뭐 찍지? AI 주제 추천</button>
   <div class="suggest-result" id="suggestResult"></div>
 
@@ -503,6 +530,33 @@ function savePersona(){
   document.getElementById('apiScreen').classList.add('hidden');
   document.getElementById('editPersonaBtn').style.display='';
   renderTopicChips();
+  initTodayRoutine();
+}
+
+// 오늘의 할 일
+function initTodayRoutine(){
+  const day = new Date().getDay();
+  const routines = {
+    0: { task: '📤 릴스 업로드 + 소통의 날', guide: '오늘 업로드하고 댓글·DM 열심히 답해요!', icon: '📱', type: 'upload' },
+    1: { task: '🔍 터진 영상 분석 + 대본 기획', guide: '잘 된 릴스 왜 터졌는지 분석하고, 다음 대본 주제 잡아요.', icon: '🔍', type: 'plan' },
+    2: { task: '🎬 영상 + 자료 제작의 날', guide: '촬영하고 편집해요. 9:16 비율, 자막 8자 이내!', icon: '🎬', type: 'create' },
+    3: { task: '📤 릴스 업로드 + 소통의 날', guide: '오늘 업로드하고 댓글·DM 열심히 답해요!', icon: '📱', type: 'upload' },
+    4: { task: '🔍 터진 영상 분석 + 대본 기획', guide: '잘 된 릴스 왜 터졌는지 분석하고, 다음 대본 주제 잡아요.', icon: '🔍', type: 'plan' },
+    5: { task: '🎬 영상 + 자료 제작의 날', guide: '촬영하고 편집해요. 9:16 비율, 자막 8자 이내!', icon: '🎬', type: 'create' },
+    6: { task: '😴 자유 / 휴식의 날', guide: '오늘은 쉬어요. 번아웃 오면 계정 오래 못 해요 💪', icon: '🛋️', type: 'rest' },
+  };
+  const r = routines[day];
+  document.getElementById('todayIcon').textContent = r.icon;
+  document.getElementById('todayTask').textContent = r.task;
+  document.getElementById('todayGuide').textContent = r.guide;
+  const actionEl = document.getElementById('autoAction');
+  if(r.type === 'plan'){
+    actionEl.innerHTML = '<button class="suggest-btn" style="margin:0;padding:10px" onclick="suggestTopics()"><span>✨</span> 오늘의 주제 추천받기</button>';
+  } else if(r.type === 'upload'){
+    actionEl.innerHTML = '<button class="suggest-btn" style="margin:0;padding:10px;background:linear-gradient(120deg,#f3eeff,#e8dbff);border-color:#d8c8f5;color:#6b21a8" onclick="showChecklist()">📋 업로드 체크리스트 열기</button>';
+  } else if(r.type === 'rest'){
+    actionEl.innerHTML = '<div style="font-size:20px;margin-top:4px">푹 쉬세요!</div>';
+  }
 }
 
 function openPersonaEdit(){
@@ -773,8 +827,10 @@ function renderTopicChips(){
     document.getElementById('apiScreen').classList.add('hidden');
     document.getElementById('editPersonaBtn').style.display='';
     renderTopicChips();
+    initTodayRoutine();
   } else {
     renderTopicChips(); // render default chips in case
+    initTodayRoutine();
   }
 })();
 
