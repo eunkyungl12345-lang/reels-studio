@@ -1,6 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 
-const client = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
+const apiKey = (process.env.CLAUDE_API_KEY || '').replace(/\s+/g, '');
+const client = new Anthropic({ apiKey });
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
