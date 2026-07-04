@@ -266,6 +266,7 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);flex-sh
     <button class="chip-btn" onclick="window.open('https://insta-challenge.vercel.app','_blank')">🏆 챌린지</button>
     <button class="chip-btn" onclick="showChecklist()">✓ 체크리스트</button>
     <button class="chip-btn" id="editPersonaBtn" style="display:none" onclick="openPersonaEdit()">페르소나 수정</button>
+    <button class="chip-btn" onclick="localStorage.removeItem('claude_api_key');toast('키 초기화됨. 다음 생성 시 다시 입력해주세요.')">🔑</button>
   </div>
 </div>
 
@@ -877,21 +878,39 @@ function pickMono(el,m){ el.parentNode.querySelectorAll('.pill').forEach(c=>c.cl
 function toggleMono(btn){ const w=document.getElementById('monoWrap'); const open=w.classList.toggle('open'); btn.textContent=open?'－ 수익화 목표 접기':'＋ 수익화 목표 넣기 (선택)'; }
 
 // ── API 호출 (서버 프록시) ──
+function getApiKey(){ return localStorage.getItem('claude_api_key')||''; }
+
 async function callClaude(prompt, maxTokens){
+  let key=getApiKey();
+  if(!key){
+    key=window.prompt('Claude API 키를 입력해주세요 (sk-ant-...)');
+    if(!key) throw new Error('API 키가 필요해요');
+    localStorage.setItem('claude_api_key', key);
+  }
   let res;
   try{
-    res=await fetch('/api/generate',{
+    res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ prompt, maxTokens: maxTokens||2200 })
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens: maxTokens||2200,
+        messages:[{role:'user',content:prompt}]
+      })
     });
-  }catch(e){ throw new Error('네트워크 오류. 서버 연결을 확인해주세요.'); }
+  }catch(e){ throw new Error('네트워크 오류. Chrome에서 열어주세요.'); }
   if(!res.ok){
     const err=await res.json().catch(()=>({}));
+    if(res.status===401){ localStorage.removeItem('claude_api_key'); throw new Error('API 키가 틀렸어요. 새로고침 후 다시 입력해주세요.'); }
     throw new Error(err.error?.message||`오류 ${res.status}`);
   }
   const data=await res.json();
-  return data.text||'';
+  return data.content?.[0]?.text||'';
 }
 
 // ── 주제 추천 ──
