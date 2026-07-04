@@ -399,6 +399,17 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);flex-sh
 <!-- ========== TAB: 분석 ========== -->
 <div class="tab" id="tab-analyze">
   <div class="step-label" style="margin-top:2px">🔥 터진 릴스 분석</div>
+
+  <!-- 벤치마킹 계정 -->
+  <div class="card" style="border:1px solid var(--accent-soft);background:linear-gradient(120deg,#fff6f2,#fdeae4);margin-bottom:12px">
+    <div style="font-size:12px;font-weight:700;color:var(--accent-ink);margin-bottom:8px">📌 벤치마킹 계정</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px" id="benchmarkList"></div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <input type="text" class="text-input" id="benchmarkInput" placeholder="@계정명 또는 인스타 링크" style="flex:1;font-size:12px;padding:9px 12px">
+      <button onclick="addBenchmark()" style="padding:9px 14px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">추가</button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="hint">잘 된 릴스의 대본·캡션을 붙여넣으면, 왜 터졌는지 + 우리 계정에 어떻게 적용할지 알려줘요.</div>
     <textarea class="analyze-ta" id="analyzeTa" placeholder="터진 릴스 대본이나 캡션을 여기 붙여넣어요…"></textarea>
@@ -1143,12 +1154,43 @@ function showChecklist(){
   document.getElementById('uploadPopup').classList.add('open');
 }
 
+// ── 벤치마킹 계정 ──
+let benchmarks=[];
+try{ benchmarks=JSON.parse(localStorage.getItem('reels_benchmarks')||'[]'); }catch(e){}
+if(!benchmarks.length) benchmarks=['@joshleeliving', '@wedding_receipt_'];
+function saveBenchmarks(){ localStorage.setItem('reels_benchmarks',JSON.stringify(benchmarks)); }
+function renderBenchmarks(){
+  document.getElementById('benchmarkList').innerHTML=benchmarks.map((b,i)=>
+    `<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--ink)">
+      <a href="https://instagram.com/${b.replace('@','')}" target="_blank" style="color:var(--accent);text-decoration:none">${b}</a>
+      <button onclick="removeBenchmark(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 2px">✕</button>
+    </span>`
+  ).join('');
+}
+function addBenchmark(){
+  let val=document.getElementById('benchmarkInput').value.trim();
+  if(!val){ toast('계정명을 입력해주세요'); return; }
+  val=val.replace(/https?:\/\/(www\.)?instagram\.com\//,'').replace(/[/?].*/,'');
+  if(!val.startsWith('@')) val='@'+val;
+  if(benchmarks.includes(val)){ toast('이미 추가된 계정이에요'); return; }
+  benchmarks.push(val);
+  saveBenchmarks(); renderBenchmarks();
+  document.getElementById('benchmarkInput').value='';
+  toast(val+' 추가됨!');
+}
+function removeBenchmark(i){
+  benchmarks.splice(i,1);
+  saveBenchmarks(); renderBenchmarks();
+}
+renderBenchmarks();
+
 // ── 분석 ──
 async function runAnalysis(){
   const text=document.getElementById('analyzeTa').value.trim();
   const account=document.getElementById('analyzeAccount').value.trim();
   if(!text){ toast('대본이나 캡션을 붙여넣어주세요'); return; }
   const persona=getPersona();
+  const benchmarkStr=benchmarks.length?`\n\n[벤치마킹 계정]\n${benchmarks.join(', ')}\n위 계정들의 콘텐츠 스타일을 참고해서 적용법을 제안해줘.`:'';
   const btn=document.getElementById('analyzeBtn');
   const result=document.getElementById('analyzeResult');
   btn.textContent='분석 중…'; btn.disabled=true;
@@ -1162,14 +1204,14 @@ ${text}
 [내 계정]
 계정 유형: ${persona.type||'미설정'}
 계정 소개: ${persona.description||'미설정'}
-콘텐츠 스타일: ${persona.style||'미설정'}
+콘텐츠 스타일: ${persona.style||'미설정'}${benchmarkStr}
 
 다음 순서로, 간결하고 실용적으로 (AI 티 나는 표현 금지):
 
 🪝 후킹 분석 — 왜 첫 문장에서 멈추게 했는지.
 🔥 왜 터졌나 — 공유형인지 저장형인지 + 핵심 이유 2~3가지.
-📐 구조 분석 — 대본 구조를 어떻게 짰는지.
-💡 우리 계정 적용법 — 같은 공식으로 내 계정에 어떻게 쓸지 구체적으로.
+📐 구조 분석 — 호명→공감→해결→CTA 4단계 공식 기준으로 분석.
+💡 우리 계정 적용법 — 같은 공식으로 내 계정에 어떻게 쓸지 구체적으로. 벤치마킹 계정 스타일도 참고.
 ✍️ 바로 써볼 후킹 3개 — 이 공식 그대로 내 계정 버전으로.`;
     const res=await callClaude(prompt);
     document.getElementById('analyzeText').textContent=res;
