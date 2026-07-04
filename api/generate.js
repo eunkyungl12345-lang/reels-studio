@@ -3,6 +3,8 @@ const Anthropic = require('@anthropic-ai/sdk');
 const apiKey = (process.env.CLAUDE_API_KEY || '').replace(/\s+/g, '');
 const client = new Anthropic({ apiKey });
 
+module.exports.config = { maxDuration: 60 };
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST only' });
