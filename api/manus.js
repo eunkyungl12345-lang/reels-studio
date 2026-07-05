@@ -36,7 +36,18 @@ export default async function handler(req) {
       }
       if (!data) return new Response(JSON.stringify({ status: 'polling' }), { status: 200 });
       const status = data.status || 'unknown';
-      const text = data.output || data.result || data.content || data.answer || '';
+      let text = data.output || data.result || data.content || data.answer || '';
+      // 마누스 응답에서 assistant 텍스트만 추출
+      if (typeof text === 'string') {
+        try {
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed)) {
+            const assistantMsgs = parsed.filter(m => m.role === 'assistant');
+            const texts = assistantMsgs.flatMap(m => (m.content || []).filter(c => c.type === 'output_text').map(c => c.text));
+            if (texts.length > 0) text = texts.join('\n\n');
+          }
+        } catch(e) {}
+      }
       return new Response(JSON.stringify({ status, text: typeof text === 'string' ? text : JSON.stringify(text) }), { status: 200 });
     }
 
