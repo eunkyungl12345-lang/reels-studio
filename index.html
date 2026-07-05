@@ -557,7 +557,11 @@ input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);flex-sh
       <div class="rb-content" id="blogBody"></div>
     </div>
     <div class="result-block">
-      <div class="rb-header"><div class="rb-label">📋 발행 체크리스트</div><button class="rb-copy" onclick="rbCopy('blogChecklist',this)">복사</button></div>
+      <div class="rb-header"><div class="rb-label">✅ 발행 전 체크리스트</div><button class="rb-copy" onclick="rbCopy('blogPreChecklist',this)">복사</button></div>
+      <div class="rb-content" id="blogPreChecklist"></div>
+    </div>
+    <div class="result-block">
+      <div class="rb-header"><div class="rb-label">📋 발행 후 체크리스트</div><button class="rb-copy" onclick="rbCopy('blogChecklist',this)">복사</button></div>
       <div class="rb-content" id="blogChecklist"></div>
     </div>
     <div class="result-block">
@@ -1611,7 +1615,17 @@ function buildBlogPrompt(topic){
 사진 위치는 [사진: ○○ 찍기 / ALT: ○○] 으로 표시.
 채우기용 문장 금지, 하지만 분량은 반드시 ${len} 이상.
 
-[발행 체크리스트]
+[발행 전 체크리스트]
+□ 제목 30~35자인지 확인 (글자수 표시)
+□ 메인 키워드가 제목 맨 앞에 있는지
+□ 검색의도 단어(후기/추천/가격/비교/솔직) 포함됐는지
+□ 사진 5장 이상 위치 표시했는지
+□ 구체 숫자 5개 이상 들어갔는지
+□ 같은 감상 반복 없는지
+□ 메인 키워드 3~5회만 사용했는지
+□ 인용구 2~3개 넣었는지
+
+[발행 후 체크리스트]
 □ 서치어드바이저(searchadvisor.naver.com) 색인 요청
 □ 발행 후 24시간 내 공감·댓글 초기 반응 확보
 □ 태그 8~10개 (메인 키워드 + 연관어 위주)
@@ -1649,7 +1663,8 @@ function renderBlogResult(text){
   // 파싱 실패 시 원본 전체를 본문에 표시
   document.getElementById('blogTitles').textContent=title||'(제목 파싱 실패 — 아래 본문에서 확인)';
   document.getElementById('blogBody').textContent=body||text;
-  document.getElementById('blogChecklist').textContent=extract(text,'발행 체크리스트')||'□ 서치어드바이저 색인 요청\n□ 발행 후 24시간 내 공감·댓글 확보\n□ 태그 8~10개 확인';
+  document.getElementById('blogPreChecklist').textContent=extract(text,'발행 전 체크리스트')||'□ 제목 30~35자 확인\n□ 메인 키워드 제목 맨 앞\n□ 검색의도 단어 포함\n□ 사진 5장+ 위치 표시\n□ 구체 숫자 5개+\n□ 감상 반복 없음\n□ 키워드 3~5회\n□ 인용구 2~3개';
+  document.getElementById('blogChecklist').textContent=extract(text,'발행 후 체크리스트')||'□ 서치어드바이저 색인 요청\n□ 발행 후 24시간 내 공감·댓글 확보\n□ 태그 8~10개 확인';
   const wrap=document.getElementById('blogTagWrap'); wrap.innerHTML='';
   const raw=extract(text,'태그');
   let arr=raw.split(/[,\n]+/).map(s=>s.trim()).filter(Boolean);
