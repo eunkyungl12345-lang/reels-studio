@@ -974,23 +974,51 @@ function pickMono(el,m){ el.parentNode.querySelectorAll('.pill').forEach(c=>c.cl
 function toggleMono(btn){ const w=document.getElementById('monoWrap'); const open=w.classList.toggle('open'); btn.textContent=open?'－ 수익화 목표 접기':'＋ 수익화 목표 넣기 (선택)'; }
 
 // ── API 호출 (서버 프록시) ──
-// 마누스 API 호출
+// 마누스 API 호출 (태스크 생성 → 프론트 폴링)
 async function callManus(prompt, onProgress){
   if(onProgress) onProgress('마누스 AI에게 요청 중...');
-  let res;
-  try{
-    res=await fetch('/api/manus',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ prompt })
-    });
-  }catch(e){ throw new Error('마누스 네트워크 오류'); }
-  if(!res.ok){
-    const err=await res.json().catch(()=>({}));
-    throw new Error(err.error||`마누스 오류 ${res.status}`);
+
+  // 1. 태스크 생성
+  const createRes=await fetch('/api/manus',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ prompt })
+  });
+  if(!createRes.ok){
+    const err=await createRes.json().catch(()=>({}));
+    throw new Error(err.error||`마누스 오류 ${createRes.status}`);
   }
-  const data=await res.json();
-  return data.text||'';
+  const createData=await createRes.json();
+  const taskId=createData.taskId;
+  if(!taskId) throw new Error('마누스 태스크 생성 실패');
+
+  if(onProgress) onProgress('마누스 AI가 작업 중... (최대 2분)');
+
+  // 2. 폴링 (프론트에서, 최대 120초)
+  for(let i=0;i<40;i++){
+    await new Promise(r=>setTimeout(r,3000));
+    if(onProgress) onProgress(`마누스 AI 작업 중... (${(i+1)*3}초)`);
+
+    try{
+      const statusRes=await fetch('/api/manus',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ action:'status', taskId })
+      });
+      const statusData=await statusRes.json();
+
+      if(statusData.status==='completed'||statusData.status==='done'){
+        return statusData.text||'';
+      }
+      if(statusData.status==='failed'||statusData.status==='error'){
+        throw new Error('마누스 태스크 실패');
+      }
+    }catch(pollErr){
+      if(pollErr.message==='마누스 태스크 실패') throw pollErr;
+      // 폴링 에러는 무시하고 계속
+    }
+  }
+  throw new Error('마누스 응답 시간 초과');
 }
 
 // Claude 스트리밍 API 호출 — onChunk 콜백으로 실시간 텍스트 전달
@@ -1390,10 +1418,13 @@ function deleteAnalyzeHistory(i){
 
 function expandHistory(i){
   const h=analyzeHistory[i];
-  document.getElementById('quickAnalyzeText').textContent=h.text;
-  document.getElementById('quickAnalyzeDate').textContent=h.dateLabel+' · '+h.account;
-  document.getElementById('quickAnalyzeResult').style.display='block';
-  document.getElementById('quickAnalyzeResult').scrollIntoView({behavior:'smooth',block:'start'});
+  // 3단계 결과 영역에 표시
+  const el=document.getElementById('step1Text');
+  if(el){
+    el.textContent=h.text;
+    const resultDiv=document.getElementById('analyze3Result');
+    if(resultDiv){ resultDiv.style.display='block'; resultDiv.scrollIntoView({behavior:'smooth',block:'start'}); }
+  }
 }
 
 function checkBenchmarkReminder(){
@@ -1417,17 +1448,11 @@ checkBenchmarkReminder();
 
 // ── 릴스 URL → 캡션 자동 가져오기 ──
 let _reelsCaption='', _reelsAccount='', _reelsUrl='';
-document.addEventListener('DOMContentLoaded', function(){
-  const urlInput=document.getElementById('reelsUrlInput');
-  if(urlInput) urlInput.addEventListener('input', debounce(fetchReelsInfo, 800));
-});
-// 즉시 실행도 가능하도록
-setTimeout(()=>{
-  const urlInput=document.getElementById('reelsUrlInput');
-  if(urlInput) urlInput.addEventListener('input', debounce(fetchReelsInfo, 800));
-},500);
-
 function debounce(fn,ms){ let t; return function(){ clearTimeout(t); t=setTimeout(fn,ms); }; }
+(function(){
+  const urlInput=document.getElementById('reelsUrlInput');
+  if(urlInput) urlInput.addEventListener('input', debounce(fetchReelsInfo, 800));
+})();
 
 async function fetchReelsInfo(){
   const url=document.getElementById('reelsUrlInput').value.trim();
