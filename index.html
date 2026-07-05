@@ -1479,52 +1479,92 @@ async function run3StepAnalysis(){
   if(!url){ toast('릴스 URL을 붙여넣어주세요'); return; }
   if(!myTopic){ toast('내 주제를 입력해주세요'); return; }
 
-  // URL에서 가져온 정보 사용
   const account=_reelsAccount||'';
   const reelsText=_reelsCaption||url;
-
   const persona=getPersona();
   const btn=document.getElementById('analyze3StepBtn');
   const lc=document.getElementById('analyze3Loading');
   const resultDiv=document.getElementById('analyze3Result');
-  btn.disabled=true; lc.classList.add('on'); resultDiv.style.display='none';
+  btn.disabled=true; resultDiv.style.display='block';
+  resultDiv.scrollIntoView({behavior:'smooth',block:'start'});
+
+  // AI 호출 함수 (마누스 우선, 실패 시 Claude)
+  async function callAI(prompt, streamEl){
+    try{
+      return await callManus(prompt, (msg)=>{
+        if(streamEl) streamEl.textContent=msg;
+      });
+    }catch(e){
+      // Claude 폴백
+      return await callClaude(prompt, 8000, (partial)=>{
+        if(streamEl) streamEl.textContent=partial;
+      });
+    }
+  }
 
   try{
-    // 마누스 → Claude 폴백
-    document.getElementById('analyze3LoadingText').textContent='마누스 AI로 분석 중…';
+    const step1El=document.getElementById('step1Text');
+    const step2El=document.getElementById('step2Text');
+    const step3El=document.getElementById('step3Text');
 
-    const prompt=`너는 인스타그램 릴스 전략가이자 대본 작가야. 아래 터진 릴스를 3단계로 분석하고 대본까지 만들어줘.
+    // ━━━ 1단계: 릴스 분석 ━━━
+    step1El.textContent='🔍 1단계 분석 중...';
+    step2El.textContent='⏳ 대기 중...';
+    step3El.textContent='⏳ 대기 중...';
 
-${account?`[원본 계정] @${account}`:''}
+    const step1Prompt=`너는 인스타그램 릴스 전략가야. 이 릴스를 분석해줘.
+
+${account?`[계정] @${account}`:''}
 [릴스 URL] ${url}
-[릴스 캡션]
-${reelsText}
+[캡션] ${reelsText}
+
+아래 관점에서 분석해줘:
+🪝 첫 1초 후킹 — 어떻게 멈추게 했는지
+📖 이야기 흐름 — 호명→공감→해결→CTA 4단계 기준으로 분석
+🎬 마무리 멘트 — CTA가 뭐였고 왜 효과적인지
+🔥 왜 잘됐는지 — 핵심 이유 2~3가지`;
+
+    const step1Result=await callAI(step1Prompt, step1El);
+    step1El.textContent=step1Result;
+
+    // ━━━ 2단계: 성공 공식 추출 ━━━
+    step2El.textContent='📐 2단계 공식 추출 중...';
+
+    const step2Prompt=`너는 인스타그램 릴스 전략가야. 아래 릴스 분석 결과를 보고, 이 영상이 잘된 공식을 추출해줘.
+
+[1단계 분석 결과]
+${step1Result}
+
+[내 계정]
+계정 유형: ${persona.type||'미설정'}
+계정 소개: ${persona.description||'미설정'}
+
+이 영상이 잘된 공식을 내 살림 주제에도 쓸 수 있게 한 문장 틀로 정리해줘.
+형식: "[호명 대상] + [공감 포인트] + [해결 방법] + [CTA]"
+예: "맞벌이 부부 000일차 + 아직도 ○○ 미루세요? + 저희는 이렇게 해요 (1,2,3단계) + 정리본 프로필 링크"
+
+공식을 정리하고, 내 계정에 어떻게 적용할지 구체적으로 알려줘.`;
+
+    const step2Result=await callAI(step2Prompt, step2El);
+    step2El.textContent=step2Result;
+
+    // ━━━ 3단계: 대본 생성 ━━━
+    step3El.textContent='✨ 3단계 대본 생성 중...';
+
+    const step3Prompt=`너는 인스타그램 릴스 대본 작가야. 아래 성공 공식을 적용해서 대본을 짜줘.
+
+[성공 공식]
+${step2Result}
 
 [내 계정]
 계정 유형: ${persona.type||'미설정'}
 계정 소개: ${persona.description||'미설정'}
 콘텐츠 스타일: ${persona.style||'미설정'}
 
-[내가 만들 주제]
+[만들 주제]
 ${myTopic}
 
-━━━ 아래 3단계 형식으로 정확히 답해줘 ━━━
-
-[1단계: 릴스 분석]
-이 릴스의 음성과 자막을 분석해줘:
-🪝 첫 1초 후킹 — 어떻게 멈추게 했는지
-📖 이야기 흐름 — 호명→공감→해결→CTA 4단계 기준으로 분석
-🎬 마무리 멘트 — CTA가 뭐였고 왜 효과적인지
-🔥 왜 잘됐는지 — 핵심 이유 2~3가지
-
-[2단계: 성공 공식]
-이 영상이 잘된 공식을 내 살림 주제에도 쓸 수 있게 한 문장 틀로 정리해줘.
-형식: "[호명 대상] + [공감 포인트] + [해결 방법] + [CTA]"
-예: "맞벌이 부부 000일차 + 아직도 ○○ 미루세요? + 저희는 이렇게 해요 (1,2,3단계) + 정리본 프로필 링크"
-
-[3단계: 내 대본]
-위 공식 틀을 적용해서 "${myTopic}" 주제로 릴스 대본을 짜줘.
-Visual/Audio/Subtitle 3트랙으로:
+위 공식을 적용해서 Visual/Audio/Subtitle 3트랙 대본을 짜줘:
 
 장면1 (호명+후킹)
 ▸ Visual: 화면에 보이는 것
@@ -1532,64 +1572,27 @@ Visual/Audio/Subtitle 3트랙으로:
 ▸ Subtitle: 화면 자막 (8자 이내)
 
 장면2 (공감)
-▸ Visual: ...
-▸ Audio: ...
-▸ Subtitle: ...
+▸ Visual: / ▸ Audio: / ▸ Subtitle:
 
 장면3~5 (해결 - 단계별, 제품 노출 시점 명시)
-▸ Visual: ...
-▸ Audio: ...
-▸ Subtitle: ...
+▸ Visual: / ▸ Audio: / ▸ Subtitle:
 
 장면6 (포인트 강조)
-▸ Visual: ...
-▸ Audio: ...
-▸ Subtitle: ...
+▸ Visual: / ▸ Audio: / ▸ Subtitle:
 
 장면7 (CTA)
-▸ Visual: ...
-▸ Audio: ...
-▸ Subtitle: ...
+▸ Visual: / ▸ Audio: / ▸ Subtitle:
 
-총 6~8장면. 말투는 구어체 카톡 말투.`;
+총 6~8장면. 말투는 구어체 카톡 말투. 포인트 강조 필수.`;
 
-    // 마누스 먼저 시도, 실패 시 Claude 폴백
-    let res;
-    const streamEl=document.getElementById('step1Text');
-    try{
-      res=await callManus(prompt, (msg)=>{
-        document.getElementById('analyze3LoadingText').textContent=msg;
-      });
-      lc.classList.remove('on');
-      resultDiv.style.display='block';
-      resultDiv.scrollIntoView({behavior:'smooth',block:'start'});
-    }catch(manusErr){
-      document.getElementById('analyze3LoadingText').textContent='Claude AI로 전환 중…';
-      lc.classList.remove('on');
-      resultDiv.style.display='block';
-      resultDiv.scrollIntoView({behavior:'smooth',block:'start'});
-      res=await callClaude(prompt, 8000, (partial)=>{
-        streamEl.textContent=partial;
-      });
-    }
+    const step3Result=await callAI(step3Prompt, step3El);
+    step3El.textContent=step3Result;
 
-    // 완료 후 3단계 파싱
-    const step1=extract(res,'1단계: 릴스 분석')||extract(res,'1단계');
-    const step2=extract(res,'2단계: 성공 공식')||extract(res,'2단계');
-    const step3=extract(res,'3단계: 내 대본')||extract(res,'3단계');
-
-    document.getElementById('step1Text').textContent=step1||res;
-    document.getElementById('step2Text').textContent=step2||'(공식 추출 결과를 위 분석에서 확인해주세요)';
-    document.getElementById('step3Text').textContent=step3||'(대본을 위 분석에서 확인해주세요)';
-
-    resultDiv.style.display='block';
-    resultDiv.scrollIntoView({behavior:'smooth',block:'start'});
-
-    // 히스토리에 저장
-    saveAnalyzeHistory(account||'직접 입력', `주제: ${myTopic}\n\n${res}`);
+    // 히스토리 저장
+    saveAnalyzeHistory(account||url, `주제: ${myTopic}\n\n[1단계 분석]\n${step1Result}\n\n[2단계 공식]\n${step2Result}\n\n[3단계 대본]\n${step3Result}`);
 
   }catch(e){ alert(e.message); }
-  btn.disabled=false; lc.classList.remove('on');
+  btn.disabled=false;
 }
 
 function copyAll3Step(){
