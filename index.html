@@ -1598,8 +1598,11 @@ function copyAll3Step(){
 }
 
 function save3StepToHistory(){
-  const text='주제: '+document.getElementById('myTopicInput').value+'\n\n'+document.getElementById('step1Text').textContent+'\n\n'+document.getElementById('step2Text').textContent+'\n\n'+document.getElementById('step3Text').textContent;
-  saveAnalyzeHistory(document.getElementById('analyzeAccount').value||'직접 입력', text);
+  const topic=document.getElementById('myTopicInput')?.value||'';
+  const url=document.getElementById('reelsUrlInput')?.value||'';
+  const account=_reelsAccount||url||'직접 입력';
+  const text='주제: '+topic+'\nURL: '+url+'\n\n'+document.getElementById('step1Text').textContent+'\n\n'+document.getElementById('step2Text').textContent+'\n\n'+document.getElementById('step3Text').textContent;
+  saveAnalyzeHistory(account, text);
   toast('히스토리에 저장됨 💾');
 }
 
