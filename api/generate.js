@@ -6,7 +6,7 @@ export default async function handler(req) {
   }
 
   const apiKey = (process.env.CLAUDE_API_KEY || '').replace(/\s+/g, '');
-  const { prompt, maxTokens } = await req.json();
+  const { prompt, maxTokens, stream } = await req.json();
 
   if (!prompt) {
     return new Response(JSON.stringify({ error: 'prompt required' }), { status: 400 });
@@ -22,7 +22,8 @@ export default async function handler(req) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: maxTokens || 3000,
+        max_tokens: maxTokens || 8000,
+        stream: true,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -32,9 +33,14 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: err.error?.message || `API ${res.status}` }), { status: res.status });
     }
 
-    const data = await res.json();
-    const text = data.content?.[0]?.text || '';
-    return new Response(JSON.stringify({ text }), { status: 200 });
+    // 스트리밍 응답을 클라이언트로 그대로 전달
+    return new Response(res.body, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message || 'API 호출 실패' }), { status: 500 });
   }

@@ -970,39 +970,49 @@ function pickMono(el,m){ el.parentNode.querySelectorAll('.pill').forEach(c=>c.cl
 function toggleMono(btn){ const w=document.getElementById('monoWrap'); const open=w.classList.toggle('open'); btn.textContent=open?'－ 수익화 목표 접기':'＋ 수익화 목표 넣기 (선택)'; }
 
 // ── API 호출 (서버 프록시) ──
-function getApiKey(){ return localStorage.getItem('claude_api_key')||''; }
-
-async function callClaude(prompt, maxTokens){
-  let key=getApiKey();
-  if(!key){
-    key=window.prompt('Claude API 키를 입력해주세요 (sk-ant-...)');
-    if(!key) throw new Error('API 키가 필요해요');
-    localStorage.setItem('claude_api_key', key);
-  }
+// 스트리밍 API 호출 — onChunk 콜백으로 실시간 텍스트 전달
+async function callClaude(prompt, maxTokens, onChunk){
   let res;
   try{
-    res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST', mode:'cors', credentials:'omit',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':key,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
-      body:JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens: maxTokens||8000,
-        messages:[{role:'user',content:prompt}]
-      })
+    res=await fetch('/api/generate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ prompt, maxTokens: maxTokens||8000, stream:true })
     });
-  }catch(e){ throw new Error('네트워크 오류. Chrome에서 열어주세요.'); }
+  }catch(e){ throw new Error('네트워크 오류. 서버 연결을 확인해주세요.'); }
   if(!res.ok){
     const err=await res.json().catch(()=>({}));
-    if(res.status===401){ localStorage.removeItem('claude_api_key'); throw new Error('API 키가 틀렸어요. 새로고침 후 다시 입력해주세요.'); }
-    throw new Error(err.error?.message||`오류 ${res.status}`);
+    throw new Error(err.error||`오류 ${res.status}`);
   }
-  const data=await res.json();
-  return data.content?.[0]?.text||'';
+
+  // 스트리밍 파싱
+  const reader=res.body.getReader();
+  const decoder=new TextDecoder();
+  let full='';
+  let buffer='';
+
+  while(true){
+    const {done,value}=await reader.read();
+    if(done) break;
+    buffer+=decoder.decode(value,{stream:true});
+
+    const lines=buffer.split('\n');
+    buffer=lines.pop()||'';
+
+    for(const line of lines){
+      if(!line.startsWith('data: ')) continue;
+      const data=line.slice(6).trim();
+      if(data==='[DONE]'||data==='') continue;
+      try{
+        const parsed=JSON.parse(data);
+        if(parsed.type==='content_block_delta'&&parsed.delta?.text){
+          full+=parsed.delta.text;
+          if(onChunk) onChunk(full);
+        }
+      }catch(e){}
+    }
+  }
+  return full;
 }
 
 // ── 주제 추천 ──
@@ -1156,13 +1166,23 @@ async function generate(){
   btn.disabled=true; lc.classList.add('on'); rw.classList.remove('on');
   lc.scrollIntoView({behavior:'smooth',block:'center'});
   try{
-    const result=await callClaude(buildPrompt(topic));
+    // 결과 영역 미리 보여주고 스트리밍 시작
+    const streamEl=document.getElementById('scriptText');
+    lc.classList.remove('on');
+    rw.classList.add('on');
+    rw.scrollIntoView({behavior:'smooth',block:'start'});
+
+    const result=await callClaude(buildPrompt(topic), 8000, (partial)=>{
+      // 실시간으로 대본 영역에 타이핑
+      streamEl.textContent=partial;
+    });
     renderResult(result);
   }catch(e){
+    lc.classList.add('on'); rw.classList.remove('on');
     lc.innerHTML=`<div style="font-size:26px;margin-bottom:10px">😢</div><div class="loading-text">실패했어요</div><div class="loading-sub" style="color:var(--accent);margin-top:6px">${e.message}</div><button onclick="document.getElementById('loadingCard').classList.remove('on');document.getElementById('generateBtn').disabled=false" style="margin-top:14px;padding:8px 18px;border-radius:10px;border:1px solid var(--border-2);background:transparent;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit">닫기</button>`;
     return;
   }
-  btn.disabled=false; lc.classList.remove('on');
+  btn.disabled=false;
 }
 
 function extract(text,key){
@@ -1477,9 +1497,17 @@ Visual/Audio/Subtitle 3트랙으로:
 
 총 6~8장면. 말투는 구어체 카톡 말투.`;
 
-    const res=await callClaude(prompt, 4096);
+    // 스트리밍으로 실시간 표시
+    lc.classList.remove('on');
+    resultDiv.style.display='block';
+    resultDiv.scrollIntoView({behavior:'smooth',block:'start'});
+    const streamEl=document.getElementById('step1Text');
 
-    // 3단계 파싱
+    const res=await callClaude(prompt, 8000, (partial)=>{
+      streamEl.textContent=partial;
+    });
+
+    // 완료 후 3단계 파싱
     const step1=extract(res,'1단계: 릴스 분석')||extract(res,'1단계');
     const step2=extract(res,'2단계: 성공 공식')||extract(res,'2단계');
     const step3=extract(res,'3단계: 내 대본')||extract(res,'3단계');
@@ -1597,12 +1625,22 @@ async function generateBlog(){
   if(!topic){ toast('주제를 먼저 정해주세요'); document.getElementById('blogTopic').focus(); return; }
   const btn=document.getElementById('blogGenBtn'), lc=document.getElementById('blogLoading'), rw=document.getElementById('blogResult');
   btn.disabled=true; lc.classList.add('on'); rw.classList.remove('on'); lc.scrollIntoView({behavior:'smooth',block:'center'});
-  try{ renderBlogResult(await callClaude(buildBlogPrompt(topic), 4096)); }
-  catch(e){
+  try{
+    const blogBodyEl=document.getElementById('blogBody');
+    lc.classList.remove('on');
+    rw.classList.add('on');
+    rw.scrollIntoView({behavior:'smooth',block:'start'});
+
+    const result=await callClaude(buildBlogPrompt(topic), 8000, (partial)=>{
+      blogBodyEl.textContent=partial;
+    });
+    renderBlogResult(result);
+  }catch(e){
+    lc.classList.add('on'); rw.classList.remove('on');
     lc.innerHTML=`<div style="font-size:26px;margin-bottom:10px">😢</div><div class="loading-text">실패했어요</div><div class="loading-sub" style="color:var(--accent);margin-top:6px">${e.message}</div><button onclick="document.getElementById('blogLoading').classList.remove('on');document.getElementById('blogGenBtn').disabled=false" style="margin-top:14px;padding:8px 18px;border-radius:10px;border:1px solid var(--border-2);background:transparent;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit">닫기</button>`;
     return;
   }
-  btn.disabled=false; lc.classList.remove('on');
+  btn.disabled=false;
 }
 function renderBlogResult(text){
   console.log('BLOG RAW:', text.substring(0, 500));
