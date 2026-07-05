@@ -37,14 +37,31 @@ export default async function handler(req) {
       if (!data) return new Response(JSON.stringify({ status: 'polling' }), { status: 200 });
       const status = data.status || 'unknown';
       let text = data.output || data.result || data.content || data.answer || '';
-      // 마누스 응답에서 assistant 텍스트만 추출
+      // 마누스 응답에서 assistant 텍스트 + 파일 내용 추출
       if (typeof text === 'string') {
         try {
           const parsed = JSON.parse(text);
           if (Array.isArray(parsed)) {
             const assistantMsgs = parsed.filter(m => m.role === 'assistant');
-            const texts = assistantMsgs.flatMap(m => (m.content || []).filter(c => c.type === 'output_text').map(c => c.text));
-            if (texts.length > 0) text = texts.join('\n\n');
+            const allContent = [];
+            for (const msg of assistantMsgs) {
+              for (const c of (msg.content || [])) {
+                if (c.type === 'output_text' && c.text) {
+                  allContent.push(c.text);
+                }
+                if (c.type === 'output_file' && c.fileUrl) {
+                  // 파일 내용 다운로드
+                  try {
+                    const fileRes = await fetch(c.fileUrl);
+                    if (fileRes.ok) {
+                      const fileText = await fileRes.text();
+                      allContent.push(fileText);
+                    }
+                  } catch(e) {}
+                }
+              }
+            }
+            if (allContent.length > 0) text = allContent.join('\n\n');
           }
         } catch(e) {}
       }
