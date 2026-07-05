@@ -974,7 +974,26 @@ function pickMono(el,m){ el.parentNode.querySelectorAll('.pill').forEach(c=>c.cl
 function toggleMono(btn){ const w=document.getElementById('monoWrap'); const open=w.classList.toggle('open'); btn.textContent=open?'－ 수익화 목표 접기':'＋ 수익화 목표 넣기 (선택)'; }
 
 // ── API 호출 (서버 프록시) ──
-// 스트리밍 API 호출 — onChunk 콜백으로 실시간 텍스트 전달
+// 마누스 API 호출
+async function callManus(prompt, onProgress){
+  if(onProgress) onProgress('마누스 AI에게 요청 중...');
+  let res;
+  try{
+    res=await fetch('/api/manus',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ prompt })
+    });
+  }catch(e){ throw new Error('마누스 네트워크 오류'); }
+  if(!res.ok){
+    const err=await res.json().catch(()=>({}));
+    throw new Error(err.error||`마누스 오류 ${res.status}`);
+  }
+  const data=await res.json();
+  return data.text||'';
+}
+
+// Claude 스트리밍 API 호출 — onChunk 콜백으로 실시간 텍스트 전달
 async function callClaude(prompt, maxTokens, onChunk){
   let res;
   try{
@@ -1170,16 +1189,24 @@ async function generate(){
   btn.disabled=true; lc.classList.add('on'); rw.classList.remove('on');
   lc.scrollIntoView({behavior:'smooth',block:'center'});
   try{
-    // 결과 영역 미리 보여주고 스트리밍 시작
     const streamEl=document.getElementById('scriptText');
-    lc.classList.remove('on');
-    rw.classList.add('on');
-    rw.scrollIntoView({behavior:'smooth',block:'start'});
+    const prompt=buildPrompt(topic);
+    let result;
 
-    const result=await callClaude(buildPrompt(topic), 8000, (partial)=>{
-      // 실시간으로 대본 영역에 타이핑
-      streamEl.textContent=partial;
-    });
+    // 마누스 먼저 시도
+    try{
+      lc.querySelector('.loading-text').textContent='마누스 AI가 대본 쓰는 중...';
+      result=await callManus(prompt, (msg)=>{ lc.querySelector('.loading-sub').textContent=msg; });
+    }catch(manusErr){
+      // 마누스 실패 → Claude 스트리밍으로 폴백
+      lc.querySelector('.loading-text').textContent='Claude AI로 전환 중...';
+      lc.classList.remove('on');
+      rw.classList.add('on');
+      rw.scrollIntoView({behavior:'smooth',block:'start'});
+      result=await callClaude(prompt, 8000, (partial)=>{
+        streamEl.textContent=partial;
+      });
+    }
     renderResult(result);
   }catch(e){
     lc.classList.add('on'); rw.classList.remove('on');
@@ -1438,8 +1465,8 @@ async function run3StepAnalysis(){
   btn.disabled=true; lc.classList.add('on'); resultDiv.style.display='none';
 
   try{
-    // 1단계 + 2단계 + 3단계를 한 번에 요청 (빠르게)
-    document.getElementById('analyze3LoadingText').textContent='분석 → 공식 추출 → 대본 생성 중…';
+    // 마누스 → Claude 폴백
+    document.getElementById('analyze3LoadingText').textContent='마누스 AI로 분석 중…';
 
     const prompt=`너는 인스타그램 릴스 전략가이자 대본 작가야. 아래 터진 릴스를 3단계로 분석하고 대본까지 만들어줘.
 
@@ -1501,15 +1528,25 @@ Visual/Audio/Subtitle 3트랙으로:
 
 총 6~8장면. 말투는 구어체 카톡 말투.`;
 
-    // 스트리밍으로 실시간 표시
-    lc.classList.remove('on');
-    resultDiv.style.display='block';
-    resultDiv.scrollIntoView({behavior:'smooth',block:'start'});
+    // 마누스 먼저 시도, 실패 시 Claude 폴백
+    let res;
     const streamEl=document.getElementById('step1Text');
-
-    const res=await callClaude(prompt, 8000, (partial)=>{
-      streamEl.textContent=partial;
-    });
+    try{
+      res=await callManus(prompt, (msg)=>{
+        document.getElementById('analyze3LoadingText').textContent=msg;
+      });
+      lc.classList.remove('on');
+      resultDiv.style.display='block';
+      resultDiv.scrollIntoView({behavior:'smooth',block:'start'});
+    }catch(manusErr){
+      document.getElementById('analyze3LoadingText').textContent='Claude AI로 전환 중…';
+      lc.classList.remove('on');
+      resultDiv.style.display='block';
+      resultDiv.scrollIntoView({behavior:'smooth',block:'start'});
+      res=await callClaude(prompt, 8000, (partial)=>{
+        streamEl.textContent=partial;
+      });
+    }
 
     // 완료 후 3단계 파싱
     const step1=extract(res,'1단계: 릴스 분석')||extract(res,'1단계');
