@@ -52,7 +52,7 @@ export default async function handler(req) {
     try {
       const r = await fetch('https://api.manus.ai/v1/tasks', {
         method: 'POST', headers,
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({ prompt: prompt, message: { content: prompt } }),
       });
       if (r.ok) task = await r.json();
       else lastError = `v1: ${r.status} ${await r.text().catch(()=>'')}`;
@@ -63,7 +63,7 @@ export default async function handler(req) {
       try {
         const r = await fetch('https://api.manus.ai/v2/task.create', {
           method: 'POST', headers,
-          body: JSON.stringify({ message: { text: prompt } }),
+          body: JSON.stringify({ message: { content: prompt } }),
         });
         if (r.ok) task = await r.json();
         else lastError += ` | v2: ${r.status} ${await r.text().catch(()=>'')}`;
